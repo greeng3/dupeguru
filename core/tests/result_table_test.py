@@ -59,3 +59,22 @@ def test_delta_flags_delta_mode_on_non_delta_columns_case_insensitive():
     app.rtable.delta_values = True
     # "ibAbtu" == "IBaBTU", flag off
     assert not app.rtable[4].is_cell_delta("name")
+
+
+def test_group_rows_alternate_shading():
+    # Rows carry their group's parity so the UI can shade adjacent groups differently. Group 0
+    # (rows 0-2) is even; group 1 (rows 3-4) is odd.
+    app = app_with_results()
+    assert not app.rtable[0].is_group_odd
+    assert not app.rtable[1].is_group_odd
+    assert not app.rtable[2].is_group_odd
+    assert app.rtable[3].is_group_odd
+    assert app.rtable[4].is_group_odd
+
+
+def test_group_representative_is_markable():
+    # The first row of each group (its representative) is now markable, so the user can choose
+    # which member to keep.
+    app = app_with_results()
+    assert app.rtable[0].markable  # group 0 representative
+    assert app.rtable[3].markable  # group 1 representative

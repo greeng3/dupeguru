@@ -300,8 +300,8 @@ class TestCaseResultsMarkings:
         self.results.mark(self.objects[2])
         self.results.mark(self.objects[4])
         eq_("2 / 3 (2.00 B / 1.01 KB) duplicates marked.", self.results.stat_line)
-        self.results.mark(self.objects[0])  # this is a ref, it can't be counted
-        eq_("2 / 3 (2.00 B / 1.01 KB) duplicates marked.", self.results.stat_line)
+        self.results.mark(self.objects[0])  # the group representative is now markable by hand
+        eq_("3 / 3 (3.00 B / 1.01 KB) duplicates marked.", self.results.stat_line)
         self.results.groups = self.groups
         eq_("0 / 3 (0.00 B / 1.01 KB) duplicates marked.", self.results.stat_line)
 
@@ -311,6 +311,41 @@ class TestCaseResultsMarkings:
         assert not self.results.mark(self.objects[1])
         self.results.mark(self.objects[2])
         eq_("1 / 2 (1.00 B / 2.00 B) duplicates marked.", self.results.stat_line)
+
+    def test_group_ref_is_markable(self):
+        # The group's representative (group.ref) can now be marked by hand, so the user can
+        # choose to keep a different member.
+        g = self.results.get_group_of_duplicate(self.objects[0])
+        assert self.objects[0] is g.ref
+        assert self.results.can_mark(self.objects[0])
+        assert self.results.mark(self.objects[0])
+        assert self.results.is_marked(self.objects[0])
+
+    def test_cannot_mark_last_unmarked_member(self):
+        # A group must always keep at least one unmarked survivor: group 1 has three members,
+        # so two can be marked but the third is refused.
+        assert self.results.mark(self.objects[0])  # the representative
+        assert self.results.mark(self.objects[1])
+        assert not self.results.can_mark(self.objects[2])
+        assert not self.results.mark(self.objects[2])
+        assert not self.results.is_marked(self.objects[2])
+
+    def test_reference_folder_file_stays_unmarkable(self):
+        # Files from reference folders (dupe.is_ref) remain protected even though the group
+        # representative is now markable.
+        self.objects[1].is_ref = True
+        self.results.groups = self.groups
+        assert not self.results.can_mark(self.objects[1])
+        assert not self.results.mark(self.objects[1])
+
+    def test_mark_all_keeps_group_representatives(self):
+        # mark_all marks every non-representative dupe and leaves each group's representative as
+        # the survivor (it can't wipe out a whole group).
+        self.results.mark_all()
+        for group in self.results.groups:
+            assert not self.results.is_marked(group.ref)
+        for dupe in self.results.dupes:
+            assert self.results.is_marked(dupe)
 
     def test_perform_on_marked(self):
         def log_object(o):

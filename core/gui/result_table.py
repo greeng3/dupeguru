@@ -15,11 +15,12 @@ from core.gui.base import DupeGuruGUIObject
 
 
 class DupeRow(Row):
-    def __init__(self, table, group, dupe):
+    def __init__(self, table, group, dupe, group_index=0):
         Row.__init__(self, table)
         self._app = table.app
         self._group = group
         self._dupe = dupe
+        self._group_index = group_index
         self._data = None
         self._data_delta = None
         self._delta_columns = None
@@ -67,7 +68,12 @@ class DupeRow(Row):
 
     @property
     def markable(self):
-        return self._app.results.is_markable(self._dupe)
+        return self._app.results.can_mark(self._dupe)
+
+    @property
+    def is_group_odd(self):
+        """Whether this row's group is at an odd index (used for alternating group shading)."""
+        return bool(self._group_index % 2)
 
     @property
     def marked(self):
@@ -103,14 +109,16 @@ class ResultTable(GUITable, DupeGuruGUIObject):
 
     def _fill(self):
         if not self.power_marker:
-            for group in self.app.results.groups:
-                self.append(DupeRow(self, group, group.ref))
+            for group_index, group in enumerate(self.app.results.groups):
+                self.append(DupeRow(self, group, group.ref, group_index=group_index))
                 for dupe in group.dupes:
-                    self.append(DupeRow(self, group, dupe))
+                    self.append(DupeRow(self, group, dupe, group_index=group_index))
         else:
+            group_indexes = {}
             for dupe in self.app.results.dupes:
                 group = self.app.results.get_group_of_duplicate(dupe)
-                self.append(DupeRow(self, group, dupe))
+                group_index = group_indexes.setdefault(id(group), len(group_indexes))
+                self.append(DupeRow(self, group, dupe, group_index=group_index))
 
     def _refresh_with_view(self):
         self.refresh()
