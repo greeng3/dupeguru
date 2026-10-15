@@ -187,12 +187,22 @@ def package_windows():
     )
     # remove version info file
     os.remove("win_version_info.txt")
-    # Call NSIS (TODO update to not use hardcoded path)
-    cmd = (
-        '"C:\\Program Files (x86)\\NSIS\\Bin\\makensis.exe" '
-        "/DVERSIONMAJOR={0} /DVERSIONMINOR={1} /DVERSIONPATCH={2} /DBITS={3} setup.nsi"
-    )
-    print_and_do(cmd.format(version_array[0], version_array[1], version_array[2], bits))
+    # Call NSIS to build the installer. Locate makensis instead of hardcoding a
+    # path: prefer it on PATH, then fall back to the common install locations.
+    makensis = shutil.which("makensis")
+    if makensis is None:
+        for candidate in (
+            r"C:\Program Files (x86)\NSIS\makensis.exe",
+            r"C:\Program Files\NSIS\makensis.exe",
+        ):
+            if op.exists(candidate):
+                makensis = candidate
+                break
+    if makensis is None:
+        print("Could not find makensis; is NSIS installed and on PATH? Exiting...")
+        return
+    cmd = '"{0}" /DVERSIONMAJOR={1} /DVERSIONMINOR={2} /DVERSIONPATCH={3} /DBITS={4} setup.nsi'
+    print_and_do(cmd.format(makensis, version_array[0], version_array[1], version_array[2], bits))
 
 
 def package_macos():
