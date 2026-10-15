@@ -4,8 +4,8 @@
 # which should be included with this package. The terms are also available at
 # http://www.gnu.org/licenses/gpl-3.0.html
 
-from PyQt5.QtCore import QSize
-from PyQt5.QtWidgets import (
+from PyQt6.QtCore import QSize
+from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
@@ -37,7 +37,7 @@ class PreferencesDialog(PreferencesDialogBase):
         self.verticalLayout_4.addWidget(self.label_6)
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setSpacing(0)
-        spacer_item = QSpacerItem(15, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        spacer_item = QSpacerItem(15, 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
         self.horizontalLayout_2.addItem(spacer_item)
         self._setupAddCheckbox("tagTrackBox", tr("Track"), self.widget)
         self.horizontalLayout_2.addWidget(self.tagTrackBox)

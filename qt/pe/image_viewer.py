@@ -2,15 +2,14 @@
 # which should be included with this package. The terms are also available at
 # http://www.gnu.org/licenses/gpl-3.0.html
 
-from PyQt5.QtCore import QObject, Qt, QSize, QRectF, QPointF, QPoint, pyqtSlot, pyqtSignal, QEvent
-from PyQt5.QtGui import QPixmap, QPainter, QPalette, QCursor, QIcon, QKeySequence
-from PyQt5.QtWidgets import (
+from PyQt6.QtCore import QObject, Qt, QSize, QRectF, QPointF, QPoint, pyqtSlot, pyqtSignal, QEvent
+from PyQt6.QtGui import QPixmap, QPainter, QPalette, QCursor, QIcon, QKeySequence, QAction
+from PyQt6.QtWidgets import (
     QGraphicsView,
     QGraphicsScene,
     QGraphicsPixmapItem,
     QToolBar,
     QToolButton,
-    QAction,
     QWidget,
     QScrollArea,
     QApplication,
@@ -58,7 +57,7 @@ class ViewerToolBar(QToolBar):
         ACTIONS = [
             (
                 "actionZoomIn",
-                QKeySequence.ZoomIn,
+                QKeySequence.StandardKey.ZoomIn,
                 (
                     QIcon.fromTheme("zoom-in")
                     if ISLINUX and not self.parent.app.prefs.details_dialog_override_theme_icons
@@ -69,7 +68,7 @@ class ViewerToolBar(QToolBar):
             ),
             (
                 "actionZoomOut",
-                QKeySequence.ZoomOut,
+                QKeySequence.StandardKey.ZoomOut,
                 (
                     QIcon.fromTheme("zoom-out")
                     if ISLINUX and not self.parent.app.prefs.details_dialog_override_theme_icons
@@ -107,9 +106,9 @@ class ViewerToolBar(QToolBar):
 
     def createButtons(self):
         self.buttonImgSwap = QToolButton(self)
-        self.buttonImgSwap.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.buttonImgSwap.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.buttonImgSwap.setIcon(
-            QIcon.fromTheme("view-refresh", self.style().standardIcon(QStyle.SP_BrowserReload))
+            QIcon.fromTheme("view-refresh", self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
             if ISLINUX and not self.parent.app.prefs.details_dialog_override_theme_icons
             else get_icon("exchange")
         )
@@ -119,22 +118,22 @@ class ViewerToolBar(QToolBar):
         self.buttonImgSwap.released.connect(self.controller.swapImages)
 
         self.buttonZoomIn = QToolButton(self)
-        self.buttonZoomIn.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.buttonZoomIn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.buttonZoomIn.setDefaultAction(self.actionZoomIn)
         self.buttonZoomIn.setEnabled(False)
 
         self.buttonZoomOut = QToolButton(self)
-        self.buttonZoomOut.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.buttonZoomOut.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.buttonZoomOut.setDefaultAction(self.actionZoomOut)
         self.buttonZoomOut.setEnabled(False)
 
         self.buttonNormalSize = QToolButton(self)
-        self.buttonNormalSize.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.buttonNormalSize.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.buttonNormalSize.setDefaultAction(self.actionNormalSize)
         self.buttonNormalSize.setEnabled(True)
 
         self.buttonBestFit = QToolButton(self)
-        self.buttonBestFit.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.buttonBestFit.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.buttonBestFit.setDefaultAction(self.actionBestFit)
         self.buttonBestFit.setEnabled(False)
 
@@ -229,10 +228,14 @@ class BaseController(QObject):
                 return target_size
             # zoomed in state, expand
             # only if not same_group, we need full update
-            scaledpixmap = pixmap.scaled(target_size, Qt.KeepAspectRatioByExpanding, Qt.FastTransformation)
+            scaledpixmap = pixmap.scaled(
+                target_size, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.FastTransformation
+            )
         else:
             # best fit, keep ratio always
-            scaledpixmap = pixmap.scaled(target_size, Qt.KeepAspectRatio, Qt.FastTransformation)
+            scaledpixmap = pixmap.scaled(
+                target_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation
+            )
         viewer.setImage(scaledpixmap)
         return target_size
 
@@ -584,8 +587,8 @@ class GraphicsViewController(BaseController):
         if not self.referencePixmap.isNull():
             self.parent.verticalToolBar.buttonImgSwap.setEnabled(True)
         # else:
-        #     self.referenceViewer.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        #     self.referenceViewer.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        #     self.referenceViewer.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        #     self.referenceViewer.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
     def updateView(self, ref, dupe, group):
         # Keep current scale accross dupes from the same group
@@ -741,7 +744,7 @@ class QWidgetImageViewer(QWidget):
         self.update()
 
     def changeEvent(self, event):
-        if event.type() == QEvent.EnabledChange:
+        if event.type() == QEvent.Type.EnabledChange:
             if self.isEnabled():
                 self.connectMouseSignals()
                 return
@@ -755,15 +758,15 @@ class QWidgetImageViewer(QWidget):
         if self.bestFit or not self.isEnabled():
             event.ignore()
             return
-        if event.button() & (Qt.LeftButton | Qt.MidButton | Qt.RightButton):
+        if event.button() & (Qt.MouseButton.LeftButton | Qt.MouseButton.MiddleButton | Qt.MouseButton.RightButton):
             self._drag = True
         else:
             self._drag = False
             event.ignore()
             return
 
-        self._lastMouseClickPoint = event.pos()
-        self._app.setOverrideCursor(Qt.ClosedHandCursor)
+        self._lastMouseClickPoint = event.position().toPoint()
+        self._app.setOverrideCursor(Qt.CursorShape.ClosedHandCursor)
         self.setMouseTracking(True)
         event.accept()
 
@@ -772,8 +775,8 @@ class QWidgetImageViewer(QWidget):
             event.ignore()
             return
 
-        self._mousePanningDelta += (event.pos() - self._lastMouseClickPoint) * 1.0 / self.current_scale
-        self._lastMouseClickPoint = event.pos()
+        self._mousePanningDelta += (event.position().toPoint() - self._lastMouseClickPoint) * 1.0 / self.current_scale
+        self._lastMouseClickPoint = event.position().toPoint()
         if self._drag:
             self.mouseDragged.emit(self._mousePanningDelta)
             self.update()
@@ -782,7 +785,7 @@ class QWidgetImageViewer(QWidget):
         if self.bestFit or not self.isEnabled():
             event.ignore()
             return
-        # if event.button() == Qt.LeftButton:
+        # if event.button() == Qt.MouseButton.LeftButton:
         self._drag = False
 
         self._app.restoreOverrideCursor()
@@ -894,18 +897,18 @@ class ScrollAreaImageViewer(QScrollArea):
         self.label = ScalablePixmap(self)
         # This is to avoid sending signals twice on scrollbar updates
         self.ignore_signal = False
-        self.setBackgroundRole(QPalette.Dark)
+        self.setBackgroundRole(QPalette.ColorRole.Dark)
         self.setWidgetResizable(False)
-        self.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
-        self.setAlignment(Qt.AlignCenter)
+        self.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._verticalScrollBar = self.verticalScrollBar()
         self._horizontalScrollBar = self.horizontalScrollBar()
 
         if self.prefs.details_dialog_viewers_show_scrollbars:
             self.toggleScrollBars()
         else:
-            self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.setWidget(self.label)
         self.setVisible(True)
@@ -917,14 +920,14 @@ class ScrollAreaImageViewer(QScrollArea):
         if not self.prefs.details_dialog_viewers_show_scrollbars:
             return
         # Ensure that it's off on the first run
-        if self.horizontalScrollBarPolicy() == Qt.ScrollBarAsNeeded:
+        if self.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded:
             if force_on:
                 return
-            self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         else:
-            self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
     def connectMouseSignals(self):
         if not self._dragConnection:
@@ -943,8 +946,12 @@ class ScrollAreaImageViewer(QScrollArea):
     def connectScrollBars(self):
         """Only call once controller is connected."""
         # Cyclic connections are handled by Qt
-        self._verticalScrollBar.valueChanged.connect(self.controller.onVScrollBarChanged, Qt.UniqueConnection)
-        self._horizontalScrollBar.valueChanged.connect(self.controller.onHScrollBarChanged, Qt.UniqueConnection)
+        self._verticalScrollBar.valueChanged.connect(
+            self.controller.onVScrollBarChanged, Qt.ConnectionType.UniqueConnection
+        )
+        self._horizontalScrollBar.valueChanged.connect(
+            self.controller.onHScrollBarChanged, Qt.ConnectionType.UniqueConnection
+        )
 
     def contextMenuEvent(self, event):
         """Block parent's (main window) context menu on right click."""
@@ -957,14 +964,14 @@ class ScrollAreaImageViewer(QScrollArea):
         if self.bestFit:
             event.ignore()
             return
-        if event.button() & (Qt.LeftButton | Qt.MidButton | Qt.RightButton):
+        if event.button() & (Qt.MouseButton.LeftButton | Qt.MouseButton.MiddleButton | Qt.MouseButton.RightButton):
             self._drag = True
         else:
             self._drag = False
             event.ignore()
             return
-        self._lastMouseClickPoint = event.pos()
-        self._app.setOverrideCursor(Qt.ClosedHandCursor)
+        self._lastMouseClickPoint = event.position().toPoint()
+        self._app.setOverrideCursor(Qt.CursorShape.ClosedHandCursor)
         self.setMouseTracking(True)
         super().mousePressEvent(event)
 
@@ -973,8 +980,8 @@ class ScrollAreaImageViewer(QScrollArea):
             event.ignore()
             return
         if self._drag:
-            delta = event.pos() - self._lastMouseClickPoint
-            self._lastMouseClickPoint = event.pos()
+            delta = event.position().toPoint() - self._lastMouseClickPoint
+            self._lastMouseClickPoint = event.position().toPoint()
             self.mouseDragged.emit(delta)
         super().mouseMoveEvent(event)
 
@@ -1129,7 +1136,7 @@ class GraphicsViewViewer(QGraphicsView):
         self.other_viewer = None
         # specific to this class
         self._scene = QGraphicsScene()
-        self._scene.setBackgroundBrush(Qt.black)
+        self._scene.setBackgroundBrush(Qt.GlobalColor.black)
         self._item = QGraphicsPixmapItem()
         self.setScene(self._scene)
         self._scene.addItem(self._item)
@@ -1141,12 +1148,12 @@ class GraphicsViewViewer(QGraphicsView):
         if self.prefs.details_dialog_viewers_show_scrollbars:
             self.toggleScrollBars()
         else:
-            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-            self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-        self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
-        self.setAlignment(Qt.AlignCenter)
-        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.setMouseTracking(True)
 
     def connectMouseSignals(self):
@@ -1166,21 +1173,25 @@ class GraphicsViewViewer(QGraphicsView):
     def connectScrollBars(self):
         """Only call once controller is connected."""
         # Cyclic connections are handled by Qt
-        self._verticalScrollBar.valueChanged.connect(self.controller.onVScrollBarChanged, Qt.UniqueConnection)
-        self._horizontalScrollBar.valueChanged.connect(self.controller.onHScrollBarChanged, Qt.UniqueConnection)
+        self._verticalScrollBar.valueChanged.connect(
+            self.controller.onVScrollBarChanged, Qt.ConnectionType.UniqueConnection
+        )
+        self._horizontalScrollBar.valueChanged.connect(
+            self.controller.onHScrollBarChanged, Qt.ConnectionType.UniqueConnection
+        )
 
     def toggleScrollBars(self, force_on=False):
         if not self.prefs.details_dialog_viewers_show_scrollbars:
             return
         # Ensure that it's off on the first run
-        if self.horizontalScrollBarPolicy() == Qt.ScrollBarAsNeeded:
+        if self.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAsNeeded:
             if force_on:
                 return
-            self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         else:
-            self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
     def contextMenuEvent(self, event):
         """Block parent's (main window) context menu on right click."""
@@ -1190,14 +1201,14 @@ class GraphicsViewViewer(QGraphicsView):
         if self.bestFit:
             event.ignore()
             return
-        if event.button() & (Qt.LeftButton | Qt.MidButton | Qt.RightButton):
+        if event.button() & (Qt.MouseButton.LeftButton | Qt.MouseButton.MiddleButton | Qt.MouseButton.RightButton):
             self._drag = True
         else:
             self._drag = False
             event.ignore()
             return
-        self._lastMouseClickPoint = event.pos()
-        self._app.setOverrideCursor(Qt.ClosedHandCursor)
+        self._lastMouseClickPoint = event.position().toPoint()
+        self._app.setOverrideCursor(Qt.CursorShape.ClosedHandCursor)
         self.setMouseTracking(True)
         # We need to propagate to scrollbars, so we send back up
         super().mousePressEvent(event)
@@ -1217,7 +1228,7 @@ class GraphicsViewViewer(QGraphicsView):
             event.ignore()
             return
         if self._drag:
-            self._lastMouseClickPoint = event.pos()
+            self._lastMouseClickPoint = event.position().toPoint()
             # We can simply rely on the scrollbar updating each other here
             # self.mouseDragged.emit()
             self.updateCenterPoint()
@@ -1300,7 +1311,7 @@ class GraphicsViewViewer(QGraphicsView):
 
     def fitScale(self):
         self.bestFit = True
-        super().fitInView(self._scene.sceneRect(), Qt.KeepAspectRatio)
+        super().fitInView(self._scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
         self.setNewCenter(self._scene.sceneRect().center())
 
     @pyqtSlot()
