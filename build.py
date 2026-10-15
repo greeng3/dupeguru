@@ -56,7 +56,7 @@ def parse_args():
         dest="modules",
         help="Build the python modules.",
     )
-    (options, args) = parser.parse_args()
+    options, args = parser.parse_args()
     return options
 
 
@@ -136,8 +136,8 @@ def build_normal():
 
 
 def main():
-    if sys.version_info < (3, 7):
-        sys.exit("Python < 3.7 is unsupported.")
+    if sys.version_info < (3, 11):
+        sys.exit("Python < 3.11 is unsupported.")
     options = parse_args()
     if options.clean and Path("build").exists():
         shutil.rmtree("build")
