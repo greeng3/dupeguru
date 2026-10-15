@@ -4,9 +4,9 @@
 # which should be included with this package. The terms are also available at
 # http://www.gnu.org/licenses/gpl-3.0.html
 
-from PyQt5.QtWidgets import QApplication, QDockWidget
-from PyQt5.QtCore import Qt, QRect, QObject, pyqtSignal
-from PyQt5.QtGui import QColor
+from PyQt6.QtWidgets import QApplication, QDockWidget
+from PyQt6.QtCore import Qt, QRect, QObject, pyqtSignal
+from PyQt6.QtGui import QColor
 
 from hscommon import trans
 from hscommon.plat import ISLINUX
@@ -143,7 +143,7 @@ class PreferencesBase(QObject):
         if geometry and len(geometry) == 7:
             m, d, area, x, y, w, h = geometry
             if m:
-                widget.setWindowState(Qt.WindowMaximized)
+                widget.setWindowState(Qt.WindowState.WindowMaximized)
             else:
                 r = QRect(x, y, w, h)
                 widget.setGeometry(r)
@@ -251,8 +251,8 @@ class Preferences(PreferencesBase):
         # By default use internal icons on platforms other than Linux for now
         self.details_dialog_override_theme_icons = False if not ISLINUX else True
         self.details_dialog_viewers_show_scrollbars = True
-        self.result_table_ref_foreground_color = QColor(Qt.blue)
-        self.result_table_ref_background_color = QColor(Qt.lightGray)
+        self.result_table_ref_foreground_color = QColor(Qt.GlobalColor.blue)
+        self.result_table_ref_background_color = QColor(Qt.GlobalColor.lightGray)
         self.result_table_delta_foreground_color = QColor(255, 142, 40)  # orange
         self.resultWindowIsMaximized = False
         self.resultWindowRect = None
