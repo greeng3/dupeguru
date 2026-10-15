@@ -90,3 +90,26 @@ jobs:
           name: dupeguru-source
           path: build/*.tar.xz
           if-no-files-found: error
+
+  # On a version tag push, gather the built packages and publish them to a GitHub Release so
+  # they have permanent download links (workflow_dispatch runs only produce expiring artifacts).
+  publish-release:
+    needs: [windows, macos, linux-source]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download built packages
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          path: dist
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            dist/*/*

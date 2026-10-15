@@ -1,3 +1,10 @@
+=== 5.0.0 (2026-10-15)
+* Let the user pick which member of a duplicate group to keep: every member is now selectable, including the group's first/representative row, and groups are visually separated with alternating shading (#15)
+* Migrate the user interface from PyQt5 to PyQt6 (#13)
+* Raise the minimum supported Python version to 3.11
+* Update bundled dependencies (PyInstaller 6, Send2Trash 2, xxhash 4, pytest, Sphinx) and development tooling
+* Add CI workflows to build per-platform install packages and run headless GUI tests
+
 === 4.3.1 (2022-07-08)
 * Fix issue where cache db exceptions could prevent files being hashed (#1015)
 * Add extra guard for non-zero length files without digests to prevent false duplicates
