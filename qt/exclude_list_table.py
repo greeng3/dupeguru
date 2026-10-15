@@ -7,6 +7,7 @@ from PyQt5.QtGui import QFont, QFontMetrics, QIcon, QColor
 
 from qt.column import Column
 from qt.table import Table
+from qt.util import get_icon
 from hscommon.trans import trget
 
 tr = trget("ui")
@@ -33,7 +34,7 @@ class ExcludeListTable(Table):
             if role == Qt.ToolTipRole and not row.markable:
                 return tr("Compilation error: ") + row.get_cell_value("error")
             if role == Qt.DecorationRole and not row.markable:
-                return QIcon.fromTheme("dialog-error", QIcon(":/error"))
+                return QIcon.fromTheme("dialog-error", get_icon("error"))
             return None
         if role == Qt.DisplayRole:
             return row.data[column.name]
