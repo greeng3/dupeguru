@@ -1,0 +1,92 @@
+# Builds installable packages for each platform and uploads them as CI artifacts.
+#
+# Scope: artifacts only for now. No code signing / notarization and no GitHub
+# Release publishing yet -- those are deliberate follow-ups. Run it manually from
+# the Actions tab (workflow_dispatch) or let it fire on a version tag push.
+
+name: Build Packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - name: Set up Python 3.12
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: "3.12"
+      - name: Install NSIS
+        run: choco install nsis --no-progress -y
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools
+          pip install -r requirements.txt -r requirements-extra.txt
+      - name: Build
+        run: python build.py
+      - name: Package
+        run: python package.py
+      - name: Upload installer
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: dupeguru-windows
+          path: dist/*.exe
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - name: Set up Python 3.12
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools
+          pip install -r requirements.txt -r requirements-extra.txt
+      - name: Build
+        run: python build.py
+      - name: Package
+        run: python package.py
+      - name: Zip app bundle
+        run: |
+          cd dist
+          zip -r -y dupeguru-macos.zip dupeguru.app
+      - name: Upload app bundle
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: dupeguru-macos
+          path: dist/dupeguru-macos.zip
+          if-no-files-found: error
+
+  linux-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - name: Set up Python 3.12
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools
+          pip install -r requirements.txt
+      - name: Package source tarball
+        run: |
+          mkdir -p build
+          python package.py --src-pkg
+      - name: Upload source tarball
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: dupeguru-source
+          path: build/*.tar.xz
+          if-no-files-found: error
