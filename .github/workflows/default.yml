@@ -74,8 +74,10 @@ jobs:
           pip install setuptools
           pip install -r requirements.txt -r requirements-extra.txt
           # PyQt6 is excluded from requirements.txt on Linux (distro-provided for
-          # end users); install it explicitly for the headless GUI test.
-          pip install "PyQt6>=6.0,<7.0"
+          # end users), and pytest-qt is a GUI-test-only dependency (kept out of
+          # requirements-extra so it doesn't load as a plugin for the core tests
+          # on platforms without a Qt binding). Install both explicitly here.
+          pip install "PyQt6>=6.0,<7.0" "pytest-qt>=4.4,<5"
       - name: Build python modules
         run: python build.py --modules
       - name: Run GUI smoke tests
