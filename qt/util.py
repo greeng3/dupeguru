@@ -25,6 +25,33 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
 )
 
+from qt.platform import IMAGES_PATH
+
+# Maps the image aliases that used to live in qt/dg.qrc to their files under images/.
+IMAGE_FILES = {
+    "logo_se": "dgse_logo_32.png",
+    "logo_se_big": "dgse_logo_128.png",
+    "plus": "plus_8.png",
+    "minus": "minus_8.png",
+    "search_clear_13": "search_clear_13.png",
+    "exchange": "exchange_purple_upscaled.png",
+    "zoom_in": "old_zoom_in.png",
+    "zoom_out": "old_zoom_out.png",
+    "zoom_original": "old_zoom_original.png",
+    "zoom_best_fit": "old_zoom_best_fit.png",
+    "error": "dialog-error.png",
+}
+
+
+def get_pixmap(name):
+    """Return the QPixmap for an image alias, loaded from the images directory."""
+    return QPixmap(op.join(IMAGES_PATH, IMAGE_FILES[name]))
+
+
+def get_icon(name):
+    """Return a QIcon for an image alias, loaded from the images directory."""
+    return QIcon(get_pixmap(name))
+
 
 def move_to_screen_center(widget):
     frame = widget.frameGeometry()
@@ -77,7 +104,7 @@ def create_actions(actions, target):
     for name, shortcut, icon, desc, func in actions:
         action = QAction(target)
         if icon:
-            action.setIcon(QIcon(QPixmap(":/" + icon)))
+            action.setIcon(get_icon(icon))
         if shortcut:
             action.setShortcut(shortcut)
         action.setText(desc)

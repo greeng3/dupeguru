@@ -63,6 +63,9 @@ def copy_files_to_package(destpath, packages, with_so):
         return
     shutil.copytree(op.join("build", "help"), op.join(destpath, "help"))
     shutil.copytree(op.join("build", "locale"), op.join(destpath, "locale"))
+    # Images used to be embedded via the compiled Qt resource file (qt/dg_rc.py); they are now
+    # loaded from the filesystem, so the images directory must ship with the package.
+    shutil.copytree("images", op.join(destpath, "images"))
     compileall.compile_dir(destpath)
 
 
@@ -180,6 +183,7 @@ def package_windows():
             "--icon=images/dgse_logo.ico",
             "--add-data={0};locale".format(LOCALE_DIR),
             "--add-data={0};help".format(HELP_DIR),
+            "--add-data=images;images",
             "--version-file=win_version_info.txt",
             "--paths=C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\ucrt\\DLLs\\{0}".format(arch),
             ENTRY_SCRIPT,
@@ -223,6 +227,7 @@ def package_macos():
             "--osx-bundle-identifier=com.hardcoded-software.dupeguru",
             "--add-data={0}:locale".format(LOCALE_DIR),
             "--add-data={0}:help".format(HELP_DIR),
+            "--add-data=images:images",
             "{0}".format(ENTRY_SCRIPT),
         ]
     )

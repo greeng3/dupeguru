@@ -23,13 +23,12 @@ from PyQt5.QtWidgets import (
     QLabel,
     QComboBox,
 )
-from PyQt5.QtGui import QPixmap, QIcon
 
 from hscommon.trans import trget
 from core.app import AppMode
 from qt.radio_box import RadioBox
 from qt.recent import Recent
-from qt.util import move_to_screen_center, create_actions
+from qt.util import move_to_screen_center, create_actions, get_icon
 
 from qt import platform
 from qt.directories_model import DirectoriesModel, DirectoriesDelegate
@@ -201,11 +200,11 @@ class DirectoriesDialog(QMainWindow):
         self.verticalLayout.addWidget(self.treeView)
         self.horizontalLayout = QHBoxLayout()
         self.removeFolderButton = QPushButton(self.centralwidget)
-        self.removeFolderButton.setIcon(QIcon(QPixmap(":/minus")))
+        self.removeFolderButton.setIcon(get_icon("minus"))
         self.removeFolderButton.setShortcut("Del")
         self.horizontalLayout.addWidget(self.removeFolderButton)
         self.addFolderButton = QPushButton(self.centralwidget)
-        self.addFolderButton.setIcon(QIcon(QPixmap(":/plus")))
+        self.addFolderButton.setIcon(get_icon("plus"))
         self.horizontalLayout.addWidget(self.addFolderButton)
         spacer_item = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacer_item)
