@@ -65,28 +65,65 @@ class Results(Markable):
         return self.__total_count
 
     def _is_markable(self, dupe):
+        # Files from user-designated reference folders (dupe.is_ref) are always protected.
+        # The group's representative (group.ref) is NOT protected anymore: the user gets to
+        # pick which member to keep, enforced by the "keep at least one" guard in mark_toggle.
         if dupe.is_ref:
             return False
         g = self.get_group_of_duplicate(dupe)
         if not g:
             return False
-        if dupe is g.ref:
-            return False
         if self.__filtered_dupes and dupe not in self.__filtered_dupes:
             return False
         return True
 
+    def _counts_as_markable(self, dupe):
+        # The group representative is markable by hand, but it stays the default survivor: it is
+        # not counted in the markable total and is not marked by bulk operations (mark_all etc.).
+        g = self.get_group_of_duplicate(dupe)
+        if g is None or dupe is g.ref:
+            return False
+        return self._is_markable(dupe)
+
+    def __unmarked_in_group(self, group):
+        # Count members that are not currently marked (unmarkable members, e.g. reference-folder
+        # files, are never marked and so always count as kept survivors).
+        return sum(1 for dupe in group if not self.is_marked(dupe))
+
+    def mark_toggle(self, dupe):
+        # Unmarking is always allowed. Marking is refused when it would leave the dupe's group
+        # with no unmarked member, so a group can never be wiped out entirely -- the user keeps
+        # whichever member they leave unmarked.
+        if not self.is_marked(dupe) and self._is_markable(dupe):
+            g = self.get_group_of_duplicate(dupe)
+            if g is not None and self.__unmarked_in_group(g) < 2:
+                return False
+        return Markable.mark_toggle(self, dupe)
+
+    def can_mark(self, dupe):
+        """Whether toggling ``dupe``'s mark is currently allowed (drives the checkbox)."""
+        if not self._is_markable(dupe):
+            return False
+        if self.is_marked(dupe):
+            return True
+        g = self.get_group_of_duplicate(dupe)
+        return g is None or self.__unmarked_in_group(g) >= 2
+
     def mark_all(self):
+        # Mark every non-representative dupe, leaving each group's representative (group.ref) as
+        # the survivor. (Inversion can't be used now that representatives are markable: it would
+        # mark them too and wipe out whole groups.)
         if self.__filters:
-            self.mark_multiple(self.__filtered_dupes)
+            self.mark_multiple([dupe for dupe in self.__filtered_dupes if self._counts_as_markable(dupe)])
         else:
-            Markable.mark_all(self)
+            self.mark_multiple(self.dupes)
 
     def mark_invert(self):
+        # Toggle every non-representative dupe, leaving each group's representative unmarked.
         if self.__filters:
-            self.mark_toggle_multiple(self.__filtered_dupes)
+            self.mark_toggle_multiple([dupe for dupe in self.__filtered_dupes if self._counts_as_markable(dupe)])
         else:
-            Markable.mark_invert(self)
+            self.mark_toggle_multiple(self.dupes)
 
     def mark_none(self):
         if self.__filters:
@@ -128,8 +165,8 @@ class Results(Markable):
         else:
             mark_count = len([dupe for dupe in self.__filtered_dupes if self.is_marked(dupe)])
             marked_size = sum(dupe.size for dupe in self.__filtered_dupes if self.is_marked(dupe))
-            total_count = len([dupe for dupe in self.__filtered_dupes if self.is_markable(dupe)])
-            total_size = sum(dupe.size for dupe in self.__filtered_dupes if self.is_markable(dupe))
+            total_count = len([dupe for dupe in self.__filtered_dupes if self._counts_as_markable(dupe)])
+            total_size = sum(dupe.size for dupe in self.__filtered_dupes if self._counts_as_markable(dupe))
         if self.mark_inverted:
             marked_size = self.__total_size - marked_size
         result = tr("%d / %d (%s / %s) duplicates marked.") % (

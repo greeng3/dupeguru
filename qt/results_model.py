@@ -7,7 +7,7 @@
 # http://www.gnu.org/licenses/gpl-3.0.html
 
 from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
-from PyQt6.QtGui import QBrush, QFont, QFontMetrics
+from PyQt6.QtGui import QBrush, QFont, QFontMetrics, QPalette
 from PyQt6.QtWidgets import QTableView
 
 from qt.table import Table
@@ -27,10 +27,19 @@ class ResultsModel(Table):
         app.willSavePrefs.connect(self.appWillSavePrefs)
         self.prefs = app.prefs
 
+    def _group_background(self, row):
+        # Representative rows keep their own highlight; other rows get an alternating per-group
+        # tint so adjacent duplicate groups are visually separated.
+        if row.isref:
+            return QBrush(self.prefs.result_table_ref_background_color)
+        if row.is_group_odd:
+            return QBrush(self.view.palette().color(QPalette.ColorRole.AlternateBase))
+        return None
+
     def _getData(self, row, column, role):
         if column.name == "marked":
-            if role == Qt.ItemDataRole.BackgroundRole and row.isref:
-                return QBrush(self.prefs.result_table_ref_background_color)
+            if role == Qt.ItemDataRole.BackgroundRole:
+                return self._group_background(row)
             if role == Qt.ItemDataRole.CheckStateRole and row.markable:
                 return Qt.CheckState.Checked if row.marked else Qt.CheckState.Unchecked
             return None
@@ -43,8 +52,7 @@ class ResultsModel(Table):
             elif row.is_cell_delta(column.name):
                 return QBrush(self.prefs.result_table_delta_foreground_color)
         elif role == Qt.ItemDataRole.BackgroundRole:
-            if row.isref:
-                return QBrush(self.prefs.result_table_ref_background_color)
+            return self._group_background(row)
         elif role == Qt.ItemDataRole.FontRole:
             font = QFont(self.view.font())
             if self.prefs.reference_bold_font:
