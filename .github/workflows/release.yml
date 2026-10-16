@@ -1,8 +1,9 @@
 # Builds installable packages for each platform and uploads them as CI artifacts.
 #
-# Scope: artifacts only for now. No code signing / notarization and no GitHub
-# Release publishing yet -- those are deliberate follow-ups. Run it manually from
-# the Actions tab (workflow_dispatch) or let it fire on a version tag push.
+# The macOS job signs + notarizes the .app when the Apple signing secrets are
+# present (otherwise it ships unsigned). Windows code signing is still a
+# follow-up. Run it manually from the Actions tab (workflow_dispatch) or let it
+# fire on a version tag push.
 
 name: Build Packages
 
@@ -41,6 +42,11 @@ jobs:
 
   macos:
     runs-on: macos-latest
+    env:
+      # Mirrored to env so later steps can gate on their presence (secrets can't
+      # be referenced directly in a step `if:`). Empty when the maintainer hasn't
+      # added the signing secrets yet -- the build then stays unsigned.
+      MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - name: Set up Python 3.12
@@ -56,6 +62,58 @@ jobs:
         run: python build.py
       - name: Package
         run: python package.py
+      - name: Sign and notarize app bundle
+        # Only runs when signing secrets are configured; otherwise the bundle
+        # ships unsigned (Gatekeeper will warn) but the build still succeeds.
+        if: env.MACOS_CERT_P12_BASE64 != ''
+        env:
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
+          AC_API_KEY_P8_BASE64: ${{ secrets.AC_API_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          APP="dist/dupeguru.app"
+
+          # 1. Import the Developer ID Application cert into a throwaway keychain.
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PW="$(openssl rand -base64 24)"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          echo "$MACOS_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERT_PASSWORD" \
+            -t cert -f pkcs12 -k "$KEYCHAIN" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PW" "$KEYCHAIN"
+          # Make the keychain searchable by codesign.
+          security list-keychains -d user -s "$KEYCHAIN" \
+            $(security list-keychains -d user | sed s/\"//g)
+
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | awk '/Developer ID Application/ {print $2; exit}')"
+          if [ -z "$IDENTITY" ]; then
+            echo "No Developer ID Application identity found in keychain" >&2
+            exit 1
+          fi
+
+          # 2. Sign with hardened runtime + secure timestamp + entitlements.
+          codesign --deep --force --options runtime --timestamp \
+            --entitlements pkg/macos/entitlements.plist \
+            --sign "$IDENTITY" "$APP"
+          codesign --verify --strict --verbose=2 "$APP"
+
+          # 3. Notarize with notarytool (App Store Connect API key) and staple.
+          echo "$AC_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/ac_api_key.p8"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --key "$RUNNER_TEMP/ac_api_key.p8" \
+            --key-id "$AC_API_KEY_ID" \
+            --issuer "$AC_API_ISSUER_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
       - name: Zip app bundle
         run: |
           cd dist
