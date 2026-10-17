@@ -1,3 +1,8 @@
+=== 5.0.1 (2026-10-16)
+* Fix the packaged app crashing on launch: leftover PyQt5 imports in hscommon were missed by the PyQt6 migration (#23)
+* Sign and notarize the macOS build so Gatekeeper no longer blocks it on first launch (#19)
+* Smoke-launch the packaged app in CI so a startup crash fails the build instead of shipping (#25)
+
 === 5.0.0 (2026-10-15)
 * Let the user pick which member of a duplicate group to keep: every member is now selectable, including the group's first/representative row, and groups are visually separated with alternating shading (#15)
 * Migrate the user interface from PyQt5 to PyQt6 (#13)
