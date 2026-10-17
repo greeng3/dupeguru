@@ -34,6 +34,16 @@ HELP_DIR = "build/help"
 def parse_args():
     parser = ArgumentParser()
     setup_package_argparser(parser)
+    parser.add_argument(
+        "--stage",
+        choices=["all", "build", "installer"],
+        default="all",
+        help=(
+            "Windows only: run just the PyInstaller 'build' stage or just the NSIS 'installer' "
+            "stage, instead of both. Lets CI sign the built binaries between the two stages. "
+            "Default: all."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -143,7 +153,12 @@ def package_source_txz():
     print_and_do("xz {}".format(dest))
 
 
-def package_windows():
+def package_windows(stage="all"):
+    # "stage" lets CI run the build in two halves so it can code-sign the
+    # PyInstaller output before NSIS wraps it into the installer:
+    #   "build"     -> PyInstaller only (produces dist/dupeguru-win<bits>/)
+    #   "installer" -> NSIS only (wraps dist/ into the installer .exe)
+    #   "all"       -> both, back to back (the default, unchanged behaviour)
     app_version = get_module_version("core")
     arch = platform.architecture()[0]
     # Information to pass to pyinstaller and NSIS
@@ -155,58 +170,62 @@ def package_windows():
         arch = "x64"
     else:
         arch = "x86"
-    # include locale files if they are built otherwise exit as it will break
-    # the localization
-    if not check_loc_doc():
-        print("Exiting...")
-        return
-    # create version information file from template
-    try:
-        version_template = open("win_version_info.temp", "r")
-        version_info = version_template.read()
-        version_template.close()
-        version_info_file = open("win_version_info.txt", "w")
-        version_info_file.write(version_info.format(version_array[0], version_array[1], version_array[2], bits))
-        version_info_file.close()
-    except Exception:
-        print("Error creating version info file, exiting...")
-        return
-    # run pyinstaller from here:
-    import PyInstaller.__main__
 
-    # UCRT dlls are included if the system has the windows kit installed
-    PyInstaller.__main__.run(
-        [
-            "--name=dupeguru-win{0}".format(bits),
-            "--windowed",
-            "--noconfirm",
-            "--icon=images/dgse_logo.ico",
-            "--add-data={0};locale".format(LOCALE_DIR),
-            "--add-data={0};help".format(HELP_DIR),
-            "--add-data=images;images",
-            "--version-file=win_version_info.txt",
-            "--paths=C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\ucrt\\DLLs\\{0}".format(arch),
-            ENTRY_SCRIPT,
-        ]
-    )
-    # remove version info file
-    os.remove("win_version_info.txt")
-    # Call NSIS to build the installer. Locate makensis instead of hardcoding a
-    # path: prefer it on PATH, then fall back to the common install locations.
-    makensis = shutil.which("makensis")
-    if makensis is None:
-        for candidate in (
-            r"C:\Program Files (x86)\NSIS\makensis.exe",
-            r"C:\Program Files\NSIS\makensis.exe",
-        ):
-            if op.exists(candidate):
-                makensis = candidate
-                break
-    if makensis is None:
-        print("Could not find makensis; is NSIS installed and on PATH? Exiting...")
-        return
-    cmd = '"{0}" /DVERSIONMAJOR={1} /DVERSIONMINOR={2} /DVERSIONPATCH={3} /DBITS={4} setup.nsi'
-    print_and_do(cmd.format(makensis, version_array[0], version_array[1], version_array[2], bits))
+    if stage in ("all", "build"):
+        # include locale files if they are built otherwise exit as it will break
+        # the localization
+        if not check_loc_doc():
+            print("Exiting...")
+            return
+        # create version information file from template
+        try:
+            version_template = open("win_version_info.temp", "r")
+            version_info = version_template.read()
+            version_template.close()
+            version_info_file = open("win_version_info.txt", "w")
+            version_info_file.write(version_info.format(version_array[0], version_array[1], version_array[2], bits))
+            version_info_file.close()
+        except Exception:
+            print("Error creating version info file, exiting...")
+            return
+        # run pyinstaller from here:
+        import PyInstaller.__main__
+
+        # UCRT dlls are included if the system has the windows kit installed
+        PyInstaller.__main__.run(
+            [
+                "--name=dupeguru-win{0}".format(bits),
+                "--windowed",
+                "--noconfirm",
+                "--icon=images/dgse_logo.ico",
+                "--add-data={0};locale".format(LOCALE_DIR),
+                "--add-data={0};help".format(HELP_DIR),
+                "--add-data=images;images",
+                "--version-file=win_version_info.txt",
+                "--paths=C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\ucrt\\DLLs\\{0}".format(arch),
+                ENTRY_SCRIPT,
+            ]
+        )
+        # remove version info file
+        os.remove("win_version_info.txt")
+
+    if stage in ("all", "installer"):
+        # Call NSIS to build the installer. Locate makensis instead of hardcoding a
+        # path: prefer it on PATH, then fall back to the common install locations.
+        makensis = shutil.which("makensis")
+        if makensis is None:
+            for candidate in (
+                r"C:\Program Files (x86)\NSIS\makensis.exe",
+                r"C:\Program Files\NSIS\makensis.exe",
+            ):
+                if op.exists(candidate):
+                    makensis = candidate
+                    break
+        if makensis is None:
+            print("Could not find makensis; is NSIS installed and on PATH? Exiting...")
+            return
+        cmd = '"{0}" /DVERSIONMAJOR={1} /DVERSIONMINOR={2} /DVERSIONPATCH={3} /DBITS={4} setup.nsi'
+        print_and_do(cmd.format(makensis, version_array[0], version_array[1], version_array[2], bits))
 
 
 def package_macos():
@@ -241,7 +260,7 @@ def main():
         return
     print("Packaging dupeGuru with UI qt")
     if sys.platform == "win32":
-        package_windows()
+        package_windows(args.stage)
     elif sys.platform == "darwin":
         package_macos()
     else:
