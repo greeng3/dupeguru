@@ -16,6 +16,11 @@ on:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      # Mirrored to env so signing steps can gate on it (secrets can't be used
+      # in a step `if:`). Empty when Azure Trusted Signing isn't configured yet
+      # -- the build then still runs and ships an unsigned installer.
+      AZURE_SIGNING: ${{ secrets.AZURE_CLIENT_ID }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - name: Set up Python 3.12
@@ -31,8 +36,66 @@ jobs:
           pip install -r requirements.txt -r requirements-extra.txt
       - name: Build
         run: python build.py
-      - name: Package
-        run: python package.py
+      - name: Build app (PyInstaller)
+        run: python package.py --stage build
+      - name: Smoke-launch the built app
+        # Launch the built exe headless and fail if it crashes on startup (the
+        # class of bug a build-only check misses). Surviving to the event loop
+        # = success.
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $exe = "dist/dupeguru-win64/dupeguru-win64.exe"
+          $p = Start-Process -FilePath $exe -PassThru `
+            -RedirectStandardOutput smoke.out.log -RedirectStandardError smoke.err.log
+          Start-Sleep -Seconds 10
+          $log = (Get-Content smoke.out.log, smoke.err.log -ErrorAction SilentlyContinue) -join "`n"
+          if ($p.HasExited) {
+            Write-Host "::error::App exited during startup (code $($p.ExitCode))"
+            Write-Host $log
+            exit 1
+          }
+          Stop-Process -Id $p.Id -Force
+          if ($log -match "Traceback|ModuleNotFoundError|Failed to execute script") {
+            Write-Host "::error::Startup produced a traceback"
+            Write-Host $log
+            exit 1
+          }
+          Write-Host "App survived startup (still running after 10s) -- OK"
+          Write-Host $log
+      - name: Sign app binaries (Azure Trusted Signing)
+        # Signs the inner PyInstaller exe before NSIS wraps it, so the installed
+        # app is signed too. Skipped when Azure signing isn't configured.
+        if: env.AZURE_SIGNING != ''
+        uses: azure/trusted-signing-action@1d365fec12862c4aa68fcac418143d73f0cea293 # v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_CODESIGN_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.AZURE_CODESIGN_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CODESIGN_PROFILE }}
+          files-folder: dist/dupeguru-win64
+          files-folder-filter: exe
+          files-folder-recurse: true
+      - name: Build installer (NSIS)
+        run: python package.py --stage installer
+      - name: Sign installer (Azure Trusted Signing)
+        # Signs the final installer -- the file users download, which is what
+        # SmartScreen evaluates. `recurse: false` restricts to dist/*.exe (the
+        # installer), leaving the already-signed inner exe untouched.
+        if: env.AZURE_SIGNING != ''
+        uses: azure/trusted-signing-action@1d365fec12862c4aa68fcac418143d73f0cea293 # v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_CODESIGN_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.AZURE_CODESIGN_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CODESIGN_PROFILE }}
+          files-folder: dist
+          files-folder-filter: exe
+          files-folder-recurse: false
       - name: Upload installer
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
