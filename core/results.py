@@ -90,24 +90,36 @@ class Results(Markable):
         # files, are never marked and so always count as kept survivors).
         return sum(1 for dupe in group if not self.is_marked(dupe))
 
-    def mark_toggle(self, dupe):
+    def mark_toggle(self, dupe, force=False):
         # Unmarking is always allowed. Marking is refused when it would leave the dupe's group
-        # with no unmarked member, so a group can never be wiped out entirely -- the user keeps
-        # whichever member they leave unmarked.
-        if not self.is_marked(dupe) and self._is_markable(dupe):
+        # with no unmarked member, so a group can never be wiped out *accidentally* -- the user
+        # keeps whichever member they leave unmarked. Pass force=True to override this once the
+        # user has explicitly confirmed they want to delete the whole group (the confirmation
+        # lives in the UI layer, which can ask; see core.app.DupeGuru._confirm_mark_would_empty).
+        if not force and not self.is_marked(dupe) and self._is_markable(dupe):
             g = self.get_group_of_duplicate(dupe)
             if g is not None and self.__unmarked_in_group(g) < 2:
                 return False
         return Markable.mark_toggle(self, dupe)
 
-    def can_mark(self, dupe):
-        """Whether toggling ``dupe``'s mark is currently allowed (drives the checkbox)."""
-        if not self._is_markable(dupe):
+    def would_empty_group(self, dupe):
+        """Whether marking ``dupe`` right now would leave its group with no unmarked member.
+
+        The UI uses this to decide when to ask the user to confirm deleting every copy in a group.
+        """
+        if self.is_marked(dupe) or not self._is_markable(dupe):
             return False
-        if self.is_marked(dupe):
-            return True
         g = self.get_group_of_duplicate(dupe)
-        return g is None or self.__unmarked_in_group(g) >= 2
+        return g is not None and self.__unmarked_in_group(g) < 2
+
+    def can_mark(self, dupe):
+        """Whether ``dupe``'s checkbox is interactive at all (drives the checkbox enabled state).
+
+        Every markable member is interactive, including the last unmarked one: marking it is
+        allowed but routed through a confirmation (deleting the whole group). Only files that can
+        never be marked -- reference-folder files and filtered-out dupes -- are non-interactive.
+        """
+        return self._is_markable(dupe)
 
     def mark_all(self):
         # Mark every non-representative dupe, leaving each group's representative (group.ref) as
