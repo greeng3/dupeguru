@@ -7,10 +7,32 @@
 # http://www.gnu.org/licenses/gpl-3.0.html
 
 from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
-from PyQt6.QtGui import QBrush, QFont, QFontMetrics, QPalette
+from PyQt6.QtGui import QBrush, QColor, QFont, QFontMetrics, QPalette
 from PyQt6.QtWidgets import QTableView
 
 from qt.table import Table
+
+# Per-group row colors: every member of a group gets one color, and successive groups cycle
+# through the palette so adjacent groups are clearly distinct. Two palettes, one per theme, each
+# tuned so the table's text keeps a comfortable contrast ratio (>= WCAG AA 4.5:1 for the default
+# text color): pale tints for light mode (dark text), deep tones for dark mode (white text). The
+# hues are kept distinct from each other so neighbouring groups never look alike.
+GROUP_COLORS_LIGHT = [
+    QColor(0xFB, 0xD4, 0xD4),  # red
+    QColor(0xD4, 0xE8, 0xFB),  # blue
+    QColor(0xD8, 0xF3, 0xD1),  # green
+    QColor(0xFB, 0xEE, 0xC9),  # yellow
+    QColor(0xEA, 0xD9, 0xF6),  # purple
+    QColor(0xCB, 0xF1, 0xEE),  # teal
+]
+GROUP_COLORS_DARK = [
+    QColor(0x5C, 0x30, 0x30),  # red
+    QColor(0x26, 0x3F, 0x5C),  # blue
+    QColor(0x2C, 0x50, 0x2C),  # green
+    QColor(0x59, 0x4D, 0x24),  # yellow
+    QColor(0x45, 0x2F, 0x5C),  # purple
+    QColor(0x22, 0x55, 0x50),  # teal
+]
 
 
 class ResultsModel(Table):
@@ -28,13 +50,13 @@ class ResultsModel(Table):
         self.prefs = app.prefs
 
     def _group_background(self, row):
-        # Representative rows keep their own highlight; other rows get an alternating per-group
-        # tint so adjacent duplicate groups are visually separated.
-        if row.isref:
-            return QBrush(self.prefs.result_table_ref_background_color)
-        if row.is_group_odd:
-            return QBrush(self.view.palette().color(QPalette.ColorRole.AlternateBase))
-        return None
+        # Every member of a group (including its representative) shares one color; successive
+        # groups cycle through the palette so adjacent groups are clearly separated. The palette
+        # is picked per theme so the table text stays readable; the representative stays
+        # identifiable via the bold reference font rather than a different background.
+        dark = self.view.palette().color(QPalette.ColorRole.Base).lightness() < 128
+        colors = GROUP_COLORS_DARK if dark else GROUP_COLORS_LIGHT
+        return QBrush(colors[row.group_color_index % len(colors)])
 
     def _getData(self, row, column, role):
         if column.name == "marked":
