@@ -33,6 +33,11 @@ GROUP_COLORS_DARK = [
     QColor(0x45, 0x2F, 0x5C),  # purple
     QColor(0x22, 0x55, 0x50),  # teal
 ]
+# Delta-cell text color, per theme. Chosen to keep an orange identity while clearing WCAG AA
+# (>= 4.5:1) against *every* group color in its theme: a dark amber reads on the pale light
+# tints, a bright amber reads on the deep dark tones.
+DELTA_FOREGROUND_LIGHT = QColor(0x7E, 0x43, 0x00)
+DELTA_FOREGROUND_DARK = QColor(0xFF, 0xC0, 0x78)
 
 
 class ResultsModel(Table):
@@ -49,13 +54,15 @@ class ResultsModel(Table):
         app.willSavePrefs.connect(self.appWillSavePrefs)
         self.prefs = app.prefs
 
+    def _is_dark_theme(self):
+        return self.view.palette().color(QPalette.ColorRole.Base).lightness() < 128
+
     def _group_background(self, row):
         # Every member of a group (including its representative) shares one color; successive
         # groups cycle through the palette so adjacent groups are clearly separated. The palette
         # is picked per theme so the table text stays readable; the representative stays
         # identifiable via the bold reference font rather than a different background.
-        dark = self.view.palette().color(QPalette.ColorRole.Base).lightness() < 128
-        colors = GROUP_COLORS_DARK if dark else GROUP_COLORS_LIGHT
+        colors = GROUP_COLORS_DARK if self._is_dark_theme() else GROUP_COLORS_LIGHT
         return QBrush(colors[row.group_color_index % len(colors)])
 
     def _getData(self, row, column, role):
@@ -69,10 +76,13 @@ class ResultsModel(Table):
             data = row.data_delta if self.model.delta_values else row.data
             return data[column.name]
         elif role == Qt.ItemDataRole.ForegroundRole:
-            if row.isref:
-                return QBrush(self.prefs.result_table_ref_foreground_color)
-            elif row.is_cell_delta(column.name):
-                return QBrush(self.prefs.result_table_delta_foreground_color)
+            # Delta cells get a theme-tuned amber that stays readable on every group color.
+            # Everything else -- including reference rows -- uses the default text color (which
+            # has strong contrast against the group backgrounds); the reference stays marked out
+            # by its bold font, not by a low-contrast foreground tint.
+            if row.is_cell_delta(column.name):
+                return QBrush(DELTA_FOREGROUND_DARK if self._is_dark_theme() else DELTA_FOREGROUND_LIGHT)
+            return None
         elif role == Qt.ItemDataRole.BackgroundRole:
             return self._group_background(row)
         elif role == Qt.ItemDataRole.FontRole:
