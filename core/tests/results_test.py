@@ -13,7 +13,7 @@ from pytest import raises
 from hscommon.testutil import eq_
 from hscommon.util import first
 from core import engine
-from core.tests.base import NamedObject, GetTestGroups, DupeGuru
+from core.tests.base import NamedObject, GetTestGroups, DupeGuru, TestApp
 from core.results import Results
 
 
@@ -321,14 +321,62 @@ class TestCaseResultsMarkings:
         assert self.results.mark(self.objects[0])
         assert self.results.is_marked(self.objects[0])
 
-    def test_cannot_mark_last_unmarked_member(self):
-        # A group must always keep at least one unmarked survivor: group 1 has three members,
-        # so two can be marked but the third is refused.
+    def test_last_unmarked_member_is_interactive_but_guarded(self):
+        # The last unmarked member stays interactive (checkbox enabled) so the UI can offer to
+        # delete the whole group, but an *unforced* mark is still refused -- the confirmation and
+        # the force=True override live in the app layer.
         assert self.results.mark(self.objects[0])  # the representative
         assert self.results.mark(self.objects[1])
-        assert not self.results.can_mark(self.objects[2])
-        assert not self.results.mark(self.objects[2])
+        assert self.results.can_mark(self.objects[2])
+        assert self.results.would_empty_group(self.objects[2])
+        assert not self.results.mark(self.objects[2])  # unforced mark refused
         assert not self.results.is_marked(self.objects[2])
+
+    def test_forced_mark_can_empty_a_group(self):
+        # With force=True (used after the user confirms) the last member can be marked, wiping the
+        # whole group out.
+        assert self.results.mark(self.objects[0])
+        assert self.results.mark(self.objects[1])
+        assert self.results.mark_toggle(self.objects[2], force=True)
+        assert self.results.is_marked(self.objects[2])
+
+    def test_would_empty_group_false_when_a_survivor_remains(self):
+        assert self.results.mark(self.objects[0])
+        assert not self.results.would_empty_group(self.objects[1])  # objects[2] still unmarked
+        assert not self.results.would_empty_group(self.objects[0])  # already marked
+
+    # These exercise the app-level confirmation wiring, so they use a fully-wired TestApp (whose
+    # GUI listeners survive the marking_changed notification) rather than the bare results object.
+    def test_mark_dupe_confirmed_empties_group(self):
+        app = TestApp().app
+        objects, _, groups = GetTestGroups()
+        app.results.groups = groups
+        app.view.ask_yes_no = lambda prompt: True
+        app.results.mark(objects[0])
+        app.results.mark(objects[1])
+        app.mark_dupe(objects[2], True)
+        assert app.results.is_marked(objects[2])
+
+    def test_mark_dupe_declined_keeps_survivor(self):
+        app = TestApp().app
+        objects, _, groups = GetTestGroups()
+        app.results.groups = groups
+        app.view.ask_yes_no = lambda prompt: False
+        app.results.mark(objects[0])
+        app.results.mark(objects[1])
+        app.mark_dupe(objects[2], True)
+        assert not app.results.is_marked(objects[2])
+
+    def test_mark_dupe_does_not_prompt_when_a_survivor_remains(self):
+        # Marking a non-last member must not trigger the whole-group confirmation.
+        app = TestApp().app
+        objects, _, groups = GetTestGroups()
+        app.results.groups = groups
+        asked = []
+        app.view.ask_yes_no = lambda prompt: asked.append(prompt) or True
+        app.mark_dupe(objects[1], True)  # objects[0] and [2] still unmarked
+        assert app.results.is_marked(objects[1])
+        assert asked == []
 
     def test_reference_folder_file_stays_unmarkable(self):
         # Files from reference folders (dupe.is_ref) remain protected even though the group

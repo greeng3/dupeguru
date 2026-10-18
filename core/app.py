@@ -47,6 +47,10 @@ MSG_MANY_FILES_TO_OPEN = tr(
     "You're about to open many files at once. Depending on what those "
     "files are opened with, doing so can create quite a mess. Continue?"
 )
+MSG_CONFIRM_DELETE_WHOLE_GROUP = tr(
+    "This is the last file still kept in its group. Marking it means every copy in the group "
+    "will be deleted, leaving nothing behind. Are you sure you want to delete them all?"
+)
 
 
 class DestType:
@@ -643,6 +647,15 @@ class DupeGuru(Broadcaster):
         self.results.mark_invert()
         self.notify("marking_changed")
 
+    def _confirm_mark_would_empty(self, dupe):
+        """Ask the user before marking ``dupe`` if doing so would wipe out its whole group.
+
+        Returns True to proceed with the mark, False to leave the dupe unmarked.
+        """
+        if not self.results.would_empty_group(dupe):
+            return True
+        return self.view.ask_yes_no(MSG_CONFIRM_DELETE_WHOLE_GROUP)
+
     def mark_dupe(self, dupe, marked):
         """Change marked status of ``dupe``.
 
@@ -651,7 +664,14 @@ class DupeGuru(Broadcaster):
         :param bool marked: True = mark, False = unmark
         """
         if marked:
-            self.results.mark(dupe)
+            if not self._confirm_mark_would_empty(dupe):
+                # User declined to wipe out the group: revert the checkbox and bail.
+                self.notify("marking_changed")
+                return
+            if not self.results.is_marked(dupe):
+                # force=True: a whole-group deletion, if that's what this is, is confirmed above;
+                # results.mark() would otherwise route through the "keep one" guard and refuse it.
+                self.results.mark_toggle(dupe, force=True)
         else:
             self.results.unmark(dupe)
         self.notify("marking_changed")
@@ -830,12 +850,20 @@ class DupeGuru(Broadcaster):
         selected = self.without_ref(self.selected_dupes)
         if not selected:
             return
-        if allsame(self.results.is_marked(d) for d in selected):
-            markfunc = self.results.mark_toggle
-        else:
-            markfunc = self.results.mark
+        # When the whole selection shares a mark state we toggle it; otherwise we mark everything.
+        toggling = allsame(self.results.is_marked(d) for d in selected)
         for dupe in selected:
-            markfunc(dupe)
+            currently_marked = self.results.is_marked(dupe)
+            if toggling and currently_marked:
+                self.results.mark_toggle(dupe)  # unmarking is always allowed
+            elif not currently_marked:
+                # This dupe is about to be marked. Confirm first if that wipes out its group;
+                # on decline, skip just this one and keep going with the rest of the selection.
+                if not self._confirm_mark_would_empty(dupe):
+                    continue
+                # force=True: the emptying case (if any) is gated by the confirmation above.
+                self.results.mark_toggle(dupe, force=True)
+            # else: not toggling and already marked -> leave it marked.
         self.notify("marking_changed")
 
     def without_ref(self, dupes):
