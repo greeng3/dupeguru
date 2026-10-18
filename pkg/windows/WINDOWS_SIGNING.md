@@ -1,20 +1,27 @@
-# Windows code signing — setup guide (Azure Trusted Signing)
+# Windows code signing — setup guide (Azure Artifact Signing)
 
 This is the complete setup to make dupeGuru's Windows build **code-signed**, so
 Windows SmartScreen stops showing the "Windows protected your PC / unknown
 publisher" warning as the signing identity builds reputation over successive
 releases.
 
-We use **Azure Trusted Signing** (recently renamed *Azure Artifact Signing*):
-Microsoft-run, cheap (~$10/mo), and it has a first-party GitHub Action. The CI
+We use **Azure Artifact Signing** (formerly, and still often, called *Azure
+Trusted Signing*): Microsoft-run, cheap (~$10/mo), with a first-party GitHub
+Action. The CI
 in `.github/workflows/release.yml` (the `windows` job) signs **both** the inner
 PyInstaller `.exe` (so the installed app is signed) **and** the final NSIS
 installer (the file users download). Signing runs **only when the Azure secrets
 below are present**; until then the build still succeeds and ships an unsigned
 installer.
 
+> **Naming:** Microsoft renamed the service from *Trusted Signing* to
+> **Artifact Signing**, but the rename is rolling out unevenly. The Azure portal
+> now lists it as **"Artifact Signing accounts"**, while the GitHub Action is
+> still `azure/trusted-signing-action` and some IAM role names may still read
+> *"Trusted Signing…"*. They are the same service.
+
 > **Reality check:** No Windows option grants *instant* SmartScreen trust
-> anymore (Microsoft removed that for EV certs in 2024). Trusted Signing builds
+> anymore (Microsoft removed that for EV certs in 2024). It builds
 > **publisher reputation over several signed releases** — expect warnings to
 > fade, not vanish on day one.
 
@@ -33,7 +40,7 @@ installer.
 - Admin access to the GitHub repo **github.com/greeng3/dupeguru** to add
   secrets.
 
-You will create: a **Trusted Signing account**, an **identity validation**, a
+You will create: an **Artifact Signing account**, an **identity validation**, a
 **certificate profile**, and a **service principal** with the signer role —
 then turn those into **six GitHub repository secrets**.
 
@@ -43,11 +50,11 @@ then turn those into **six GitHub repository secrets**.
 
 ---
 
-## Part A — Create the Trusted Signing account
+## Part A — Create the Artifact Signing account
 
-1. In the [Azure portal](https://portal.azure.com), search for **Trusted
-   Signing Accounts** (may appear as *Azure Artifact Signing*) and click
-   **Create**.
+1. In the [Azure portal](https://portal.azure.com), search for **Artifact
+   Signing accounts** (older docs call this *Trusted Signing accounts*) and
+   click **Create**.
 2. Choose your subscription + a resource group (create one, e.g.
    `dupeguru-signing`).
 3. Pick a **region** — remember it; it determines the signing **endpoint** URL
@@ -63,7 +70,7 @@ release build needs.
 
 ## Part B — Validate your identity
 
-1. In your Trusted Signing account, open **Identity validations** → **New
+1. In your Artifact Signing account, open **Identity validations** → **New
    identity validation**.
 2. Choose **Individual** (or **Organization** if you prefer the publisher name
    to be an org). Fill in the details exactly as on your government ID.
@@ -107,9 +114,10 @@ client secret.
 
 ### D.3 Grant the signer role
 
-1. Go to your **Trusted Signing account** → **Access control (IAM)** → **Add
+1. Go to your **Artifact Signing account** → **Access control (IAM)** → **Add
    role assignment**.
-2. Role: **Trusted Signing Certificate Profile Signer**.
+2. Role: **Trusted Signing Certificate Profile Signer** (may now read
+   *Artifact Signing Certificate Profile Signer* — same role).
 3. Assign access to the **service principal** (`dupeguru-ci-signing`).
 4. Save. Without this role you'll get **403** errors from the signing step.
 
@@ -123,7 +131,7 @@ client secret.
 | `AZURE_CLIENT_ID` | Application (client) ID (Part D.1) — also the flag CI uses to detect that signing is configured |
 | `AZURE_CLIENT_SECRET` | the client secret **Value** (Part D.2) |
 | `AZURE_CODESIGN_ENDPOINT` | region endpoint, e.g. `https://eus.codesigning.azure.net/` (Part A.3) |
-| `AZURE_CODESIGN_ACCOUNT` | Trusted Signing account name, exact case (Part A.4) |
+| `AZURE_CODESIGN_ACCOUNT` | Artifact Signing account name, exact case (Part A.4) |
 | `AZURE_CODESIGN_PROFILE` | certificate profile name, exact case (Part C.4) |
 
 ---
@@ -171,17 +179,18 @@ Get-AuthenticodeSignature .\dupeGuru_win64_<version>.exe | Format-List Status, S
 the inner exe in between:
 
 1. `--stage build` → PyInstaller → `dist/dupeguru-win64/`
-2. **Sign app binaries** → Azure Trusted Signing over `dist/dupeguru-win64/*.exe`
+2. **Sign app binaries** → Azure Artifact Signing over `dist/dupeguru-win64/*.exe`
 3. `--stage installer` → NSIS → `dist/dupeGuru_win64_<version>.exe`
-4. **Sign installer** → Azure Trusted Signing over `dist/*.exe` (top level only)
+4. **Sign installer** → Azure Artifact Signing over `dist/*.exe` (top level only)
 
 ---
 
 ## Troubleshooting
 
-- **403 from the signing step:** the service principal is missing the **Trusted
-  Signing Certificate Profile Signer** role on the account (Part D.3), or the
-  role hasn't propagated yet (wait a few minutes).
+- **403 from the signing step:** the service principal is missing the
+  **Trusted Signing Certificate Profile Signer** role (may read *Artifact
+  Signing…*) on the account (Part D.3), or the role hasn't propagated yet
+  (wait a few minutes).
 - **Endpoint/region mismatch:** `AZURE_CODESIGN_ENDPOINT` must match the region
   where the account/profile live (Part A.3).
 - **Account/profile not found:** names are **case-sensitive** — copy them
