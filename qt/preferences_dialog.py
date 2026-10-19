@@ -158,13 +158,6 @@ Some native dialogs have limited functionality."))
         formlayout.addRow(tr("Font size:"), self.fontSizeSpinBox)
         self._setupAddCheckbox("reference_bold_font", tr("Use bold font for references"))
         formlayout.addRow(self.reference_bold_font)
-
-        self.result_table_ref_foreground_color = ColorPickerButton(self)
-        formlayout.addRow(tr("Reference foreground color:"), self.result_table_ref_foreground_color)
-        self.result_table_ref_background_color = ColorPickerButton(self)
-        formlayout.addRow(tr("Reference background color:"), self.result_table_ref_background_color)
-        self.result_table_delta_foreground_color = ColorPickerButton(self)
-        formlayout.addRow(tr("Delta foreground color:"), self.result_table_delta_foreground_color)
         formlayout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
 
         # Keep same vertical spacing as parent layout for consistency
@@ -322,9 +315,6 @@ most users should not have to modify these."),
             )
             self.fontSizeSpinBox.setValue(prefs.tableFontSize)
             self.details_table_delta_foreground_color.setColor(prefs.details_table_delta_foreground_color)
-            self.result_table_ref_foreground_color.setColor(prefs.result_table_ref_foreground_color)
-            self.result_table_ref_background_color.setColor(prefs.result_table_ref_background_color)
-            self.result_table_delta_foreground_color.setColor(prefs.result_table_delta_foreground_color)
             try:
                 selected_lang = self.supportedLanguages[self.app.prefs.language]
             except KeyError:
@@ -357,9 +347,6 @@ most users should not have to modify these."),
         prefs.details_dialog_titlebar_enabled = ischecked(self.details_dialog_titlebar_enabled)
         prefs.details_dialog_vertical_titlebar = ischecked(self.details_dialog_vertical_titlebar)
         prefs.details_table_delta_foreground_color = self.details_table_delta_foreground_color.color
-        prefs.result_table_ref_foreground_color = self.result_table_ref_foreground_color.color
-        prefs.result_table_ref_background_color = self.result_table_ref_background_color.color
-        prefs.result_table_delta_foreground_color = self.result_table_delta_foreground_color.color
         prefs.destination_type = self.copyMoveDestinationComboBox.currentIndex()
         prefs.custom_command = str(self.customCommandEdit.text())
         prefs.tableFontSize = self.fontSizeSpinBox.value()

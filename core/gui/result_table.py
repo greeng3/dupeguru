@@ -71,9 +71,9 @@ class DupeRow(Row):
         return self._app.results.can_mark(self._dupe)
 
     @property
-    def is_group_odd(self):
-        """Whether this row's group is at an odd index (used for alternating group shading)."""
-        return bool(self._group_index % 2)
+    def group_color_index(self):
+        """This row's group ordinal, used to pick a per-group color (cycled through a palette)."""
+        return self._group_index
 
     @property
     def marked(self):

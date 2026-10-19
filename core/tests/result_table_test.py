@@ -61,15 +61,15 @@ def test_delta_flags_delta_mode_on_non_delta_columns_case_insensitive():
     assert not app.rtable[4].is_cell_delta("name")
 
 
-def test_group_rows_alternate_shading():
-    # Rows carry their group's parity so the UI can shade adjacent groups differently. Group 0
-    # (rows 0-2) is even; group 1 (rows 3-4) is odd.
+def test_group_rows_carry_group_color_index():
+    # Every row carries its group's ordinal so the UI can give each group a distinct color.
+    # Group 0 spans rows 0-2, group 1 spans rows 3-4.
     app = app_with_results()
-    assert not app.rtable[0].is_group_odd
-    assert not app.rtable[1].is_group_odd
-    assert not app.rtable[2].is_group_odd
-    assert app.rtable[3].is_group_odd
-    assert app.rtable[4].is_group_odd
+    assert app.rtable[0].group_color_index == 0
+    assert app.rtable[1].group_color_index == 0
+    assert app.rtable[2].group_color_index == 0
+    assert app.rtable[3].group_color_index == 1
+    assert app.rtable[4].group_color_index == 1
 
 
 def test_group_representative_is_markable():
