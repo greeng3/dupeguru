@@ -1,5 +1,10 @@
 # Windows code signing — setup guide (Azure Trusted Signing)
 
+> **SUPERSEDED (2026-10-19).** The project moved off Azure (its Microsoft-login
+> flow kept failing) to **Certum Open Source Code Signing** — see
+> [`CERTUM_SIGNING.md`](CERTUM_SIGNING.md). This Azure guide is kept for
+> reference only; the CI has not yet been reworked away from it.
+
 This is the complete setup to make dupeGuru's Windows build **code-signed**, so
 Windows SmartScreen stops showing the "Windows protected your PC / unknown
 publisher" warning as the signing identity builds reputation over successive
