@@ -138,6 +138,15 @@ class ResultsModel(Table):
         self.model._columns.save_columns()
 
     # --- model --> view
+    def refresh(self):
+        super().refresh()
+        # Force the view to repaint its cell backgrounds. After a model reset that changes the
+        # row count (notably the asynchronous "Send to Recycle Bin" deletion), the table can
+        # keep painting the previous per-group colors by row position until another event
+        # (scroll/hover/resort) triggers a redraw. The explicit viewport update makes the
+        # recomputed per-group colors show immediately. See issue #37.
+        self.view.viewport().update()
+
     def invalidate_markings(self):
         # redraw view
         # HACK. this is the only way I found to update the widget without reseting everything
