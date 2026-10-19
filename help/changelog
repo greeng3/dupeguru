@@ -1,6 +1,9 @@
-=== 5.0.1 (2026-10-16)
+=== 5.1.0 (2026-10-18)
+* Let the user delete an entire duplicate group (every copy) behind a confirmation prompt, so whole groups of junk files can be cleared out at once (#32)
+* Give each duplicate group its own distinct, high-contrast color, with every member of a group sharing that color and successive groups clearly different (#34)
 * Fix the packaged app crashing on launch: leftover PyQt5 imports in hscommon were missed by the PyQt6 migration (#23)
 * Sign and notarize the macOS build so Gatekeeper no longer blocks it on first launch (#19)
+* Sign the Windows build with Azure Trusted Signing when signing is configured (#29)
 * Smoke-launch the packaged app in CI so a startup crash fails the build instead of shipping (#25)
 
 === 5.0.0 (2026-10-15)
