@@ -1,3 +1,6 @@
+=== 5.1.1 (2026-10-18)
+* Fix duplicate-group colors not refreshing after removing or deleting duplicates: surviving rows could keep the previous row's color until a scroll or re-sort (#37)
+
 === 5.1.0 (2026-10-18)
 * Let the user delete an entire duplicate group (every copy) behind a confirmation prompt, so whole groups of junk files can be cleared out at once (#32)
 * Give each duplicate group its own distinct, high-contrast color, with every member of a group sharing that color and successive groups clearly different (#34)
