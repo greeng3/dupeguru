@@ -1,5 +1,16 @@
 # Windows code signing — Certum Open Source Code Signing (step-by-step)
 
+> **⚠️ READ THIS BEFORE YOU START SIMPLYSIGN ENROLLMENT ⚠️**
+>
+> During SimplySign 2FA setup you are shown a **TOTP secret** (a QR code and/or a
+> Base32 text key) **exactly once.** If you plan to sign in **CI**, you MUST
+> **save the text secret** at that moment (password manager). Do **not** just
+> scan the QR into your phone and continue — the secret is never shown again.
+> **Already enrolled without saving it?** You didn't break anything — jump to
+> **[Recovery: I enrolled without saving the TOTP seed](#recovery-i-enrolled-without-saving-the-totp-seed)**.
+> **Only signing locally?** You don't need the seed at all — see
+> **[Alternative: local signing](#alternative-local-signing-no-signing-credential-in-ci)**.
+
 This is the complete walkthrough to make dupeGuru's Windows build **publicly
 code-signed** using a **Certum Open Source Code Signing** certificate, so
 Windows SmartScreen/UAC stop showing "unknown publisher" and the publisher
@@ -273,22 +284,115 @@ volume.
 
 ---
 
+## Recovery: I enrolled without saving the TOTP seed
+
+You did **not** break anything. The certificate and your identity validation are
+untouched, and your SimplySign **mobile app still works**. The only thing missing
+is the TOTP seed, which SimplySign shows only once during token setup. You get it
+back by **re-provisioning the SimplySign token**, which mints a fresh seed.
+
+**First, decide whether you even need it:**
+
+- **Signing locally?** You need nothing — your mobile app already approves
+  sessions. Skip to [Alternative: local signing](#alternative-local-signing-no-signing-credential-in-ci).
+- **Signing in CI?** You need the seed → do the steps below.
+
+### Step 1 — Try self-service re-provisioning
+
+1. Log in to your **SimplySign / Certum account panel** (the web dashboard where
+   you manage the account and certificate).
+2. Look for token/device management — labels vary: **"Tokens"**, **"Devices"**,
+   **"SimplySign Mobile"**, **"Reset token"**, **"Add device"**.
+3. If you can start a **new token activation / re-activation** yourself, do it,
+   then continue at **Step 3**.
+4. No self-service option? Go to **Step 2**.
+
+### Step 2 — Request a token (service access) reset from Certum
+
+Per Certum's SimplySign manuals, resetting/moving the token goes through support:
+
+1. Contact **Certum support / the Certum Help line** (support form, email, or
+   phone, from certum.eu) and ask for a **"service access reset"** (token reset)
+   for your SimplySign account.
+2. **Verify your identity** — they confirm the account holder's details.
+3. They email a **one-time link plus a reset credential** — a QR **"photocode"**
+   or a **16-character resetting code**, **valid ~24 hours**, so be ready to act.
+4. In the **SimplySign mobile app**, use the **activation / reset-code** option
+   and enter the photocode or 16-char code to re-activate the token.
+
+### Step 3 — Capture the seed THIS time (for CI)
+
+- You need the raw **Base32 TOTP secret**, not just a working app. **Follow
+  [ssign's README](https://github.com/Le-Syl21/ssign) for exactly how to capture
+  the SimplySign secret** — SimplySign's activation code isn't necessarily a plain
+  `otpauth://` TOTP URI, and ssign is the tool that consumes the seed, so its
+  documented method is authoritative.
+- **Save the secret in a password manager immediately** — this is the step that
+  bit you last time.
+- Finish activation in the mobile app too, so interactive/local signing still
+  works.
+
+### Step 4 — Sanity-check the seed
+
+- Confirm the saved seed generates the **same 6-digit codes** your SimplySign app
+  shows (any TOTP tool, or ssign's own auth check). If they match, proceed to
+  **Part D** (collect email + seed + thumbprint) and **Part E** (GitHub secrets).
+
+> If re-provisioning turns into a hassle, the **local-signing** path below needs
+> none of this.
+
+---
+
 ## Alternative: local signing (no signing credential in CI)
 
-If putting the TOTP seed in CI secrets isn't acceptable, sign **on your own
-Windows machine** instead:
+Sign on your **own Windows machine** with the mobile app for 2FA. Nothing
+sensitive ever goes into CI — at the cost of one manual step per release. This
+needs **no TOTP seed**, so it also sidesteps the recovery above entirely.
 
-1. Build the release artifacts (CI produces the **unsigned** installer, or build
-   locally).
-2. Run **SimplySign Desktop**, log in, approve the session with the **mobile
-   app**.
-3. Sign the inner exe and the installer with `signtool` (or ssign) using the
-   cert thumbprint and `http://time.certum.pl`.
-4. Upload the signed installer to the GitHub Release manually.
+**One-time setup**
+
+1. Install **SimplySign Desktop** (from certum.eu) on your Windows PC.
+2. Make sure your **SimplySign mobile app** token is active (you did this during
+   enrollment).
+3. Get your certificate **SHA-1 thumbprint** (Part D.3).
+4. Install **signtool** (ships with the Windows 10/11 SDK or the Visual Studio
+   Build Tools).
+
+**Each release**
+
+1. **Get the unsigned artifacts.** Easiest: run **Actions → Build Packages** (or
+   push the release tag), then download the `dupeguru-windows` artifact / the
+   installer from the Release. (Or build locally: `python build.py && python
+   package.py`.)
+2. **Start a signing session.** Open **SimplySign Desktop → Log in**, and
+   **approve the session in the mobile app** (enter the OTP / tap approve). This
+   mounts your cloud certificate as a virtual smart card for the session.
+3. **Sign the installer** (select the cert by thumbprint, timestamp against
+   Certum):
+
+   ```
+   signtool sign /sha1 <YOUR_40_CHAR_THUMBPRINT> /fd SHA256 /tr http://time.certum.pl /td SHA256 dupeGuru_win64_<ver>.exe
+   ```
+
+4. **Verify:**
+
+   ```powershell
+   Get-AuthenticodeSignature .\dupeGuru_win64_<ver>.exe | Format-List Status, SignerCertificate
+   ```
+
+   `Status` should be **Valid**, signer **Open Source Developer &lt;Your Name&gt;**.
+5. **Upload** the signed installer to the GitHub Release, replacing the unsigned
+   one: `gh release upload v<ver> dupeGuru_win64_<ver>.exe --clobber`.
+
+> To also sign the **installed** exe (not just the downloaded installer), build
+> locally and sign the inner exe *before* NSIS wraps it, using the same two-stage
+> split CI uses: `python package.py --stage build` → sign
+> `dist\dupeguru-win64\dupeguru-win64.exe` → `python package.py --stage installer`
+> → sign the installer. For a personal fork, signing just the installer is
+> usually enough.
 
 This keeps the signing credential entirely on your machine + phone (nothing in
-CI), at the cost of a manual step each release. It's the most conservative
-option and still produces the same publicly-trusted signature.
+CI) and still produces the same publicly-trusted signature.
 
 ---
 
